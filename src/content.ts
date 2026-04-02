@@ -36,12 +36,20 @@ function detectJSON(): { data: JsonValue; raw: string } | null {
   }
 }
 
+function storageGet(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
+function storageSet(key: string, value: string): void {
+  try { localStorage.setItem(key, value); } catch {}
+}
+
 function getTheme(): string {
-  return localStorage.getItem("jv-theme") || "auto";
+  return storageGet("jv-theme") || "auto";
 }
 
 function setTheme(theme: string): void {
-  localStorage.setItem("jv-theme", theme);
+  storageSet("jv-theme", theme);
   const root = document.getElementById("jv-root");
   if (root) root.dataset.theme = theme;
 }
@@ -117,7 +125,7 @@ function init(): void {
       root.style.setProperty("--cursor-custom", "default");
     }
   }
-  applyCustomCursor(localStorage.getItem("jv-custom-cursor") === "true");
+  applyCustomCursor(storageGet("jv-custom-cursor") === "true");
 
   // Re-inject styles (we nuked the head)
   const style = document.createElement("style");
@@ -244,9 +252,9 @@ function init(): void {
 
   // Custom cursor toggle
   const cursorCheckbox = document.getElementById("jv-cursor-toggle") as HTMLInputElement;
-  cursorCheckbox.checked = localStorage.getItem("jv-custom-cursor") === "true";
+  cursorCheckbox.checked = storageGet("jv-custom-cursor") === "true";
   cursorCheckbox.addEventListener("change", () => {
-    localStorage.setItem("jv-custom-cursor", String(cursorCheckbox.checked));
+    storageSet("jv-custom-cursor", String(cursorCheckbox.checked));
     applyCustomCursor(cursorCheckbox.checked);
   });
 
@@ -258,15 +266,19 @@ function init(): void {
 }
 
 function injectPageData(raw: string): void {
-  const holder = document.createElement("script");
-  holder.type = "application/json";
-  holder.id = "jv-json-data";
-  holder.textContent = raw;
-  document.documentElement.appendChild(holder);
+  try {
+    const holder = document.createElement("script");
+    holder.type = "application/json";
+    holder.id = "jv-json-data";
+    holder.textContent = raw;
+    document.documentElement.appendChild(holder);
 
-  const script = document.createElement("script");
-  script.src = chrome.runtime.getURL("page-script.js");
-  document.documentElement.appendChild(script);
+    const script = document.createElement("script");
+    script.src = chrome.runtime.getURL("page-script.js");
+    document.documentElement.appendChild(script);
+  } catch {
+    // Sandboxed frames block script injection — window.data won't be available
+  }
 }
 
 init();

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "npm run build && ENTRY=content vite build --watch",
-    "build": "ENTRY=content vite build && ENTRY=page-script vite build"
+    "build": "ENTRY=content vite build && ENTRY=page-script vite build",
+    "zip": "npm run build && cd dist && zip -r ../json-alexander.zip . && cd .."
   },
   "devDependencies": {
     "typescript": "^5.8.0",
