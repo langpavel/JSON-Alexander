@@ -21,6 +21,7 @@ body {
   --string: #a6e3a1;
   --number: #fab387;
   --bool: #cba6f7;
+  --link: #a6e3a1;
   --null: #6c7086;
   --bracket: #585b70;
   --punctuation: #585b70;
@@ -46,6 +47,7 @@ body {
   --string: #2e7d32;
   --number: #e65100;
   --bool: #7b1fa2;
+  --link: #2e7d32;
   --null: #9e9e9e;
   --bracket: #757575;
   --punctuation: #757575;
@@ -72,6 +74,7 @@ body {
     --string: #2e7d32;
     --number: #e65100;
     --bool: #7b1fa2;
+    --link: #2e7d32;
     --null: #9e9e9e;
     --bracket: #757575;
     --punctuation: #757575;
@@ -291,6 +294,14 @@ body {
 
 .jv-bool {
   color: var(--bool);
+}
+
+.jv-link {
+  color: var(--link);
+}
+
+#jv-root .jv-string .jv-link:hover {
+  cursor: pointer !important;
 }
 
 .jv-null {

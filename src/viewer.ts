@@ -40,11 +40,18 @@ function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function renderStringValue(str: string): string {
+  if (/^https?:\/\/[^\s]+$/.test(str)) {
+    return `<a class="jv-link" href="` + escapeHtml(str) + `">` + escapeHtml(str) + "</a>"
+  }
+  return escapeHtml(str)
+}
+
 function renderValue(value: JsonValue): string {
   const type = typeOf(value);
   switch (type) {
     case "string":
-      return `<span class="jv-string">"${escapeHtml(value as string)}"</span>`;
+      return `<span class="jv-string">"${renderStringValue(value as string)}"</span>`;
     case "number":
       return `<span class="jv-number">${value}</span>`;
     case "boolean":
