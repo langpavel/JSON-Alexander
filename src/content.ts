@@ -271,10 +271,10 @@ async function init(): Promise<void> {
   setupHoverPath(tree, pathText, pathDisplay, pathCopyBtn);
 
   // Inject data into page context.
-  injectPageData();
+  injectPageData(raw);
 }
 
-function injectPageData(): void {
+function injectPageData(raw: string): void {
   // CSP `sandbox` without `allow-same-origin` sets window.origin to the string
   // "null". Injecting a <script> into such a page logs a CSP violation, so bail
   // out early. This covers the common case (e.g. GitHub raw files).
