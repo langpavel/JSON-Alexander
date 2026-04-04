@@ -20,6 +20,64 @@ function buildPath(
   return `${parentPath}["${key}"]`;
 }
 
+function parsePath(path: string): Array<string | number> | null {
+  if (!path.startsWith("data")) return null;
+  if (path === "data") return [];
+
+  const tokens: Array<string | number> = [];
+  let i = 4;
+  while (i < path.length) {
+    const ch = path[i];
+    if (ch === ".") {
+      i += 1;
+      let start = i;
+      while (i < path.length && path[i] !== "." && path[i] !== "[") i += 1;
+      if (start === i) return null;
+      tokens.push(path.slice(start, i));
+      continue;
+    }
+    if (ch !== "[") return null;
+    if (path[i + 1] === "\"") {
+      i += 2;
+      const start = i;
+      while (i < path.length && path[i] !== "\"") i += 1;
+      if (i >= path.length || path[i + 1] !== "]") return null;
+      tokens.push(path.slice(start, i));
+      i += 2;
+      continue;
+    }
+
+    i += 1;
+    const start = i;
+    while (i < path.length && /[0-9]/.test(path[i])) i += 1;
+    if (start === i || path[i] !== "]") return null;
+    tokens.push(Number(path.slice(start, i)));
+    i += 1;
+  }
+
+  return tokens;
+}
+
+export function getValueAtPath(data: JsonValue, path: string): JsonValue | undefined {
+  const tokens = parsePath(path);
+  if (!tokens) return;
+
+  let current: JsonValue = data;
+  for (const token of tokens) {
+    if (Array.isArray(current)) {
+      if (typeof token !== "number") return;
+      if (token < 0 || token >= current.length) return;
+      current = current[token];
+      continue;
+    }
+    if (current === null || typeof current !== "object") return;
+    if (typeof token !== "string") return;
+    if (!(token in current)) return;
+    current = (current as Record<string, JsonValue>)[token];
+  }
+  return current;
+}
+
 function countEntries(value: JsonValue): number {
   if (Array.isArray(value)) return value.length;
   if (value !== null && typeof value === "object") return Object.keys(value).length;
@@ -102,9 +160,10 @@ function renderNode(
       ? value.some((v) => v !== null && typeof v === "object")
       : Object.values(value as Record<string, JsonValue>).some((v) => v !== null && typeof v === "object");
 
-    const actionsHtml = hasNestedContainers
-      ? `<span class="jv-inline-actions"><button class="jv-action-children" title="Expand/collapse all children">⇕ children</button></span>`
+    const childrenActionHtml = hasNestedContainers
+      ? `<button class="jv-action-children" title="Expand/collapse all children">⇕ children</button>`
       : "";
+    const actionsHtml = `<span class="jv-inline-actions">${childrenActionHtml}<button class="jv-action-copy" title="Copy this node as JSON">copy</button></span>`;
 
     const countHtml = label ? `<span class="jv-count"> ${label}</span>` : "";
     line.innerHTML = `<span class="jv-toggle">▶</span>${keyHtml}<span class="jv-bracket">${openBracket}</span>${countHtml}<span class="jv-preview"> ${label} ${closeBracket}</span>${actionsHtml}`;
