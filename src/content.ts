@@ -6,7 +6,7 @@ import {
   toggleAllChildren,
   setupHoverPath,
 } from "./viewer";
-import "./styles/viewer.css";
+import viewerCss from "./styles/viewer.css?inline";
 
 type JsonValue =
   | string
@@ -37,12 +37,20 @@ function detectJSON(): { data: JsonValue; raw: string } | null {
 }
 
 async function storageGet(key: string, defaultValue: string): Promise<string> {
-  const result = await chrome.storage.local.get({ [key]: defaultValue });
-  return result[key];
+  try {
+    const result = await chrome.storage.local.get({ [key]: defaultValue });
+    return result[key];
+  } catch {
+    return defaultValue;
+  }
 }
 
 async function storageSet(key: string, value: string): Promise<void> {
-  await chrome.storage.local.set({ [key]: value });
+  try {
+    await chrome.storage.local.set({ [key]: value });
+  } catch {
+    // Storage unavailable — ignore silently
+  }
 }
 
 async function getTheme(): Promise<string> {
@@ -57,7 +65,8 @@ async function setTheme(theme: string): Promise<void> {
 
 async function cycleTheme(): Promise<void> {
   const current = await getTheme();
-  const next = current === "auto" ? "dark" : current === "dark" ? "light" : "auto";
+  const next =
+    current === "auto" ? "dark" : current === "dark" ? "light" : "auto";
   await setTheme(next);
   await updateThemeButton();
 }
@@ -77,14 +86,22 @@ async function init(): Promise<void> {
   const { data, raw } = result;
   const prettyRaw = JSON.stringify(data, null, 2);
 
-  // Nuke existing page content
-  document.documentElement.innerHTML = "";
-  const head = document.createElement("head");
-  const body = document.createElement("body");
-  document.documentElement.appendChild(head);
-  document.documentElement.appendChild(body);
+  // Inject styles into the existing <head> — no need to nuke or recreate it.
+  // Using an inline <style> tag (CSS bundled via ?inline Vite import) means
+  // the stylesheet is always available regardless of CSP, sandbox restrictions,
+  // or extension resource fetch policies.
+  const style = document.createElement("style");
+  style.id = "jv-styles";
+  style.textContent = viewerCss;
+  if (!document.getElementById("jv-styles")) {
+    document.head.appendChild(style);
+  }
 
-  // Build viewer DOM
+  // Clear only the body — preserve <head> and all its existing nodes.
+  document.body.innerHTML = "";
+  document.body.style.margin = "0";
+
+  // Build viewer root
   const root = document.createElement("div");
   root.id = "jv-root";
   root.dataset.theme = await getTheme();
@@ -115,7 +132,7 @@ async function init(): Promise<void> {
     </div>
   `;
 
-  body.appendChild(root);
+  document.body.appendChild(root);
 
   // Custom cursor (off by default)
   const cursorUrl = chrome.runtime.getURL("pointer-32.png");
@@ -126,18 +143,7 @@ async function init(): Promise<void> {
       root.style.setProperty("--cursor-custom", "default");
     }
   }
-  applyCustomCursor(await storageGet("jv-custom-cursor", "false") === "true");
-
-  // Re-inject styles (we nuked the head)
-  const style = document.createElement("style");
-  style.textContent = (document.querySelector('style[data-vite-dev-id]') || {} as any).textContent || '';
-  // For production, the CSS is loaded via manifest. We need to re-add the link.
-  // Vite injects CSS as a <style> tag in dev, but for extension we load via manifest.
-  // Since we nuked the HTML, re-request the CSS from the extension.
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = chrome.runtime.getURL("content.css");
-  head.appendChild(link);
+  applyCustomCursor((await storageGet("jv-custom-cursor", "false")) === "true");
 
   const tree = document.getElementById("jv-tree")!;
   const formattedEl = document.getElementById("jv-formatted")!;
@@ -148,15 +154,12 @@ async function init(): Promise<void> {
   const info = document.getElementById("jv-info")!;
   const levelsContainer = document.getElementById("jv-levels")!;
 
-  // Render tree
   const { maxDepth, totalKeys } = renderTree(tree, data);
   info.textContent = `${totalKeys} nodes · ${maxDepth} level${maxDepth !== 1 ? "s" : ""} deep`;
 
-  // Formatted and raw views
   formattedEl.textContent = prettyRaw;
   rawEl.textContent = raw;
 
-  // Level buttons
   const levelCount = Math.min(maxDepth, 8);
   for (let i = 1; i <= levelCount; i++) {
     const btn = document.createElement("button");
@@ -178,41 +181,46 @@ async function init(): Promise<void> {
   });
   levelsContainer.appendChild(allBtn);
 
-  // Set "All" as initially active
   setActiveLevel(allBtn);
 
   function setActiveLevel(active: HTMLElement) {
-    levelsContainer.querySelectorAll("button").forEach((b) =>
-      b.classList.remove("jv-active")
-    );
+    levelsContainer
+      .querySelectorAll("button")
+      .forEach((b) => b.classList.remove("jv-active"));
     active.classList.add("jv-active");
   }
 
-  // Toggle expand/collapse on click
   tree.addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
-    if (target.classList.contains("jv-toggle") || target.classList.contains("jv-preview")) {
+    if (
+      target.classList.contains("jv-toggle") ||
+      target.classList.contains("jv-preview")
+    ) {
       const line = target.closest<HTMLElement>(".jv-line");
       if (line) {
         toggleNode(line);
-        levelsContainer.querySelectorAll("button").forEach((b) =>
-          b.classList.remove("jv-active")
-        );
+        levelsContainer
+          .querySelectorAll("button")
+          .forEach((b) => b.classList.remove("jv-active"));
       }
     }
-    // Inline action: expand/collapse all children
     if (target.classList.contains("jv-action-children")) {
       const line = target.closest<HTMLElement>(".jv-line");
       if (line) toggleAllChildren(line);
     }
   });
 
-  // View picker
   const viewBtns = document.querySelectorAll<HTMLElement>(".jv-view-btn");
-  const views: Record<string, HTMLElement> = { tree, formatted: formattedEl, raw: rawEl };
+  const views: Record<string, HTMLElement> = {
+    tree,
+    formatted: formattedEl,
+    raw: rawEl,
+  };
 
   function setView(name: string) {
-    viewBtns.forEach((b) => b.classList.toggle("jv-active", b.dataset.view === name));
+    viewBtns.forEach((b) =>
+      b.classList.toggle("jv-active", b.dataset.view === name),
+    );
     Object.entries(views).forEach(([key, el]) => {
       el.classList.toggle("jv-active", key === name);
       el.classList.toggle("jv-hidden", key !== name);
@@ -223,7 +231,6 @@ async function init(): Promise<void> {
     btn.addEventListener("click", () => setView(btn.dataset.view!));
   });
 
-  // Copy
   document.getElementById("jv-copy")!.addEventListener("click", () => {
     navigator.clipboard.writeText(prettyRaw).then(() => {
       const btn = document.getElementById("jv-copy")!;
@@ -235,11 +242,11 @@ async function init(): Promise<void> {
     });
   });
 
-  // Theme toggle
   await updateThemeButton();
-  document.getElementById("jv-theme-toggle")!.addEventListener("click", cycleTheme);
+  document
+    .getElementById("jv-theme-toggle")!
+    .addEventListener("click", cycleTheme);
 
-  // Settings menu
   const settingsToggle = document.getElementById("jv-settings-toggle")!;
   const settingsMenu = document.getElementById("jv-settings-menu")!;
   settingsToggle.addEventListener("click", () => {
@@ -251,35 +258,41 @@ async function init(): Promise<void> {
     }
   });
 
-  // Custom cursor toggle
-  const cursorCheckbox = document.getElementById("jv-cursor-toggle") as HTMLInputElement;
-  cursorCheckbox.checked = await storageGet("jv-custom-cursor", "false") === "true";
+  const cursorCheckbox = document.getElementById(
+    "jv-cursor-toggle",
+  ) as HTMLInputElement;
+  cursorCheckbox.checked =
+    (await storageGet("jv-custom-cursor", "false")) === "true";
   cursorCheckbox.addEventListener("change", async () => {
     await storageSet("jv-custom-cursor", String(cursorCheckbox.checked));
     applyCustomCursor(cursorCheckbox.checked);
   });
 
-  // Hover path
   setupHoverPath(tree, pathText, pathDisplay, pathCopyBtn);
 
-  // Inject data into page context
-  injectPageData(raw);
+  // Inject data into page context.
+  injectPageData();
 }
 
-function injectPageData(raw: string): void {
-  try {
-    const holder = document.createElement("script");
-    holder.type = "application/json";
-    holder.id = "jv-json-data";
-    holder.textContent = raw;
-    document.documentElement.appendChild(holder);
-
-    const script = document.createElement("script");
-    script.src = chrome.runtime.getURL("page-script.js");
-    document.documentElement.appendChild(script);
-  } catch {
-    // Sandboxed frames block script injection — window.data won't be available
+function injectPageData(): void {
+  // CSP `sandbox` without `allow-same-origin` sets window.origin to the string
+  // "null". Injecting a <script> into such a page logs a CSP violation, so bail
+  // out early. This covers the common case (e.g. GitHub raw files).
+  if (window.origin === "null") {
+    return;
   }
+
+  // Inject the raw JSON data into the page context via a <script> tag with type="application/json".
+  const dataHolder = document.createElement("script");
+  dataHolder.type = "application/json";
+  dataHolder.id = "jv-json-data";
+  dataHolder.textContent = raw;
+  document.documentElement.appendChild(dataHolder);
+
+  // Inject the page script that reads the JSON from the DOM and assigns it to window.data.
+  const script = document.createElement("script");
+  script.src = chrome.runtime.getURL("page-script.js");
+  document.documentElement.appendChild(script);
 }
 
 init();
