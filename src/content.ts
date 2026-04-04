@@ -39,7 +39,7 @@ function detectJSON(): { data: JsonValue; raw: string } | null {
 
 async function storageGet(key: string, defaultValue: string): Promise<string> {
   const result = await chrome.storage.local.get({ [key]: defaultValue });
-  return result[key];
+  return result[key] as string;
 }
 
 async function storageSet(key: string, value: string): Promise<void> {
