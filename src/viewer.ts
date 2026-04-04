@@ -11,7 +11,7 @@ let maxDepth = 0;
 function buildPath(
   parentPath: string,
   key: string | number,
-  isArrayElement: boolean
+  isArrayElement: boolean,
 ): string {
   if (isArrayElement) return `${parentPath}[${key}]`;
   if (typeof key === "string" && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key)) {
@@ -37,10 +37,10 @@ function parsePath(path: string): Array<string | number> | null {
       continue;
     }
     if (ch !== "[") return null;
-    if (path[i + 1] === "\"") {
+    if (path[i + 1] === '"') {
       i += 2;
       const start = i;
-      while (i < path.length && path[i] !== "\"") i += 1;
+      while (i < path.length && path[i] !== '"') i += 1;
       if (i >= path.length || path[i + 1] !== "]") return null;
       tokens.push(path.slice(start, i));
       i += 2;
@@ -58,7 +58,10 @@ function parsePath(path: string): Array<string | number> | null {
   return tokens;
 }
 
-export function getValueAtPath(data: JsonValue, path: string): JsonValue | undefined {
+export function getValueAtPath(
+  data: JsonValue,
+  path: string,
+): JsonValue | undefined {
   const tokens = parsePath(path);
   if (!tokens) return;
 
@@ -80,7 +83,8 @@ export function getValueAtPath(data: JsonValue, path: string): JsonValue | undef
 
 function countEntries(value: JsonValue): number {
   if (Array.isArray(value)) return value.length;
-  if (value !== null && typeof value === "object") return Object.keys(value).length;
+  if (value !== null && typeof value === "object")
+    return Object.keys(value).length;
   return 0;
 }
 
@@ -100,9 +104,15 @@ function escapeHtml(str: string): string {
 
 function renderStringValue(str: string): string {
   if (/^https?:\/\/[^\s]+$/.test(str)) {
-    return `<a class="jv-link" href="` + escapeHtml(str) + `">` + escapeHtml(str) + "</a>"
+    return (
+      `<a rel="noopener noreferrer" class="jv-link" href="` +
+      escapeHtml(str) +
+      `">` +
+      escapeHtml(str) +
+      "</a>"
+    );
   }
-  return escapeHtml(str)
+  return escapeHtml(str);
 }
 
 function renderValue(value: JsonValue): string {
@@ -127,7 +137,7 @@ function renderNode(
   path: string,
   depth: number,
   isLast: boolean,
-  isArrayElement: boolean
+  isArrayElement: boolean,
 ): HTMLDivElement {
   const line = document.createElement("div");
   line.className = "jv-line";
@@ -158,7 +168,9 @@ function renderNode(
 
     const hasNestedContainers = Array.isArray(value)
       ? value.some((v) => v !== null && typeof v === "object")
-      : Object.values(value as Record<string, JsonValue>).some((v) => v !== null && typeof v === "object");
+      : Object.values(value as Record<string, JsonValue>).some(
+          (v) => v !== null && typeof v === "object",
+        );
 
     const childrenActionHtml = hasNestedContainers
       ? `<button class="jv-action-children" title="Expand/collapse all children">⇕ children</button>`
@@ -175,7 +187,14 @@ function renderNode(
       value.forEach((item, i) => {
         const childPath = buildPath(path, i, true);
         children.appendChild(
-          renderNode(i, item, childPath, depth + 1, i === value.length - 1, true)
+          renderNode(
+            i,
+            item,
+            childPath,
+            depth + 1,
+            i === value.length - 1,
+            true,
+          ),
         );
       });
     } else if (value !== null && typeof value === "object") {
@@ -189,8 +208,8 @@ function renderNode(
             childPath,
             depth + 1,
             i === keys.length - 1,
-            false
-          )
+            false,
+          ),
         );
       });
     }
@@ -215,7 +234,7 @@ function renderNode(
 
 export function renderTree(
   container: HTMLElement,
-  data: JsonValue
+  data: JsonValue,
 ): { maxDepth: number; totalKeys: number } {
   maxDepth = 0;
   container.innerHTML = "";
@@ -229,7 +248,7 @@ export function renderTree(
 
 export function collapseToLevel(
   container: HTMLElement,
-  targetLevel: number
+  targetLevel: number,
 ): void {
   container.querySelectorAll<HTMLElement>(".jv-line").forEach((line) => {
     const depth = parseInt(line.dataset.depth || "0", 10);
@@ -261,8 +280,11 @@ export function toggleAllChildren(line: HTMLElement): void {
   const children = line.querySelector<HTMLElement>(":scope > .jv-children");
   if (!children) return;
   // Determine target state: if any descendant is collapsed, expand all; otherwise collapse all
-  const collapsedDescendants = children.querySelectorAll<HTMLElement>(".jv-children.jv-collapsed");
-  const allDescendantContainers = children.querySelectorAll<HTMLElement>(".jv-children");
+  const collapsedDescendants = children.querySelectorAll<HTMLElement>(
+    ".jv-children.jv-collapsed",
+  );
+  const allDescendantContainers =
+    children.querySelectorAll<HTMLElement>(".jv-children");
   const shouldExpand = collapsedDescendants.length > 0;
 
   allDescendantContainers.forEach((el) => {
@@ -278,19 +300,20 @@ export function toggleAllChildren(line: HTMLElement): void {
   line.classList.remove("jv-collapsed");
 }
 
-
 export function setupHoverPath(
   tree: HTMLElement,
   pathText: HTMLElement,
   pathDisplay: HTMLElement,
-  pathCopyBtn: HTMLElement
+  pathCopyBtn: HTMLElement,
 ): void {
   let pinned = false;
 
   function clearHighlights() {
-    tree.querySelectorAll<HTMLElement>(".jv-current, .jv-ancestor").forEach((el) => {
-      el.classList.remove("jv-current", "jv-ancestor");
-    });
+    tree
+      .querySelectorAll<HTMLElement>(".jv-current, .jv-ancestor")
+      .forEach((el) => {
+        el.classList.remove("jv-current", "jv-ancestor");
+      });
   }
 
   function highlightLine(line: HTMLElement) {
@@ -347,7 +370,8 @@ export function setupHoverPath(
       target.classList.contains("jv-toggle") ||
       target.classList.contains("jv-preview") ||
       target.closest(".jv-inline-actions")
-    ) return;
+    )
+      return;
 
     const line = target.closest<HTMLElement>(".jv-line");
     if (!line) return;
