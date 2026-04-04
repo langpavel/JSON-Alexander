@@ -202,7 +202,7 @@ async function init(): Promise<void> {
       if (node === undefined) return;
       navigator.clipboard.writeText(JSON.stringify(node, null, 2)).then(() => {
         const orig = copyBtn.textContent;
-        copyBtn.textContent = "copied!";
+        copyBtn.textContent = "Copied!";
         setTimeout(() => {
           copyBtn.textContent = orig;
         }, 1000);
