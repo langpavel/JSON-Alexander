@@ -4,6 +4,7 @@ import {
   expandAll,
   toggleNode,
   toggleAllChildren,
+  getValueAtPath,
   setupHoverPath,
 } from "./viewer";
 import "./styles/viewer.css";
@@ -191,6 +192,31 @@ async function init(): Promise<void> {
   // Toggle expand/collapse on click
   tree.addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
+    const copyBtn = target.closest<HTMLButtonElement>(".jv-action-copy");
+    if (copyBtn) {
+      const line = copyBtn.closest<HTMLElement>(".jv-line");
+      if (!line) return;
+      const path = line.dataset.path;
+      if (!path) return;
+      const node = getValueAtPath(data, path);
+      if (node === undefined) return;
+      navigator.clipboard.writeText(JSON.stringify(node, null, 2)).then(() => {
+        const orig = copyBtn.textContent;
+        copyBtn.textContent = "copied!";
+        setTimeout(() => {
+          copyBtn.textContent = orig;
+        }, 1000);
+      });
+      return;
+    }
+
+    const childrenBtn = target.closest<HTMLButtonElement>(".jv-action-children");
+    if (childrenBtn) {
+      const line = childrenBtn.closest<HTMLElement>(".jv-line");
+      if (line) toggleAllChildren(line);
+      return;
+    }
+
     if (target.classList.contains("jv-toggle") || target.classList.contains("jv-preview")) {
       const line = target.closest<HTMLElement>(".jv-line");
       if (line) {
@@ -199,11 +225,6 @@ async function init(): Promise<void> {
           b.classList.remove("jv-active")
         );
       }
-    }
-    // Inline action: expand/collapse all children
-    if (target.classList.contains("jv-action-children")) {
-      const line = target.closest<HTMLElement>(".jv-line");
-      if (line) toggleAllChildren(line);
     }
   });
 
