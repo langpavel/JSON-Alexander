@@ -17,14 +17,10 @@ type JsonValue =
   | { [key: string]: JsonValue };
 
 /**
- * Returns true when the document is running inside a CSP-sandboxed
- * browsing context that lacks `allow-same-origin` (e.g. raw.githubusercontent.com).
- *
- * In such contexts:
- *  - `window.localStorage` throws SecurityError
- *  - DOM <script> injection is blocked (no `allow-scripts`)
- *
- * The viewer still renders fully; settings fall back to compile-time defaults.
+ * Returns true when the document is inside a CSP-sandboxed context
+ * that omits `allow-same-origin` (e.g. raw.githubusercontent.com).
+ * Used to skip script injection, which the browser blocks with a
+ * console warning before any JS exception is thrown — not catchable.
  */
 function isSandboxed(): boolean {
   try {
@@ -56,14 +52,20 @@ function detectJSON(): { data: JsonValue; raw: string } | null {
 }
 
 async function storageGet(key: string, defaultValue: string): Promise<string> {
-  if (isSandboxed()) return defaultValue;
-  const result = await chrome.storage.local.get({ [key]: defaultValue });
-  return result[key];
+  try {
+    const result = await chrome.storage.local.get({ [key]: defaultValue });
+    return result[key];
+  } catch {
+    return defaultValue;
+  }
 }
 
 async function storageSet(key: string, value: string): Promise<void> {
-  if (isSandboxed()) return;
-  await chrome.storage.local.set({ [key]: value });
+  try {
+    await chrome.storage.local.set({ [key]: value });
+  } catch {
+    // Storage unavailable — ignore silently
+  }
 }
 
 async function getTheme(): Promise<string> {
@@ -110,8 +112,6 @@ async function init(): Promise<void> {
   }
 
   // Clear only the body — preserve <head> and all its existing nodes.
-  // This avoids the entire "DOM nuke" fragility: no need to rebuild <head>,
-  // re-inject stylesheets, or worry about resource loading races.
   document.body.innerHTML = "";
   document.body.style.margin = "0";
 
@@ -168,15 +168,12 @@ async function init(): Promise<void> {
   const info = document.getElementById("jv-info")!;
   const levelsContainer = document.getElementById("jv-levels")!;
 
-  // Render tree
   const { maxDepth, totalKeys } = renderTree(tree, data);
   info.textContent = `${totalKeys} nodes · ${maxDepth} level${maxDepth !== 1 ? "s" : ""} deep`;
 
-  // Formatted and raw views
   formattedEl.textContent = prettyRaw;
   rawEl.textContent = raw;
 
-  // Level buttons
   const levelCount = Math.min(maxDepth, 8);
   for (let i = 1; i <= levelCount; i++) {
     const btn = document.createElement("button");
@@ -207,7 +204,6 @@ async function init(): Promise<void> {
     active.classList.add("jv-active");
   }
 
-  // Toggle expand/collapse on click
   tree.addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
     if (target.classList.contains("jv-toggle") || target.classList.contains("jv-preview")) {
@@ -225,7 +221,6 @@ async function init(): Promise<void> {
     }
   });
 
-  // View picker
   const viewBtns = document.querySelectorAll<HTMLElement>(".jv-view-btn");
   const views: Record<string, HTMLElement> = { tree, formatted: formattedEl, raw: rawEl };
 
@@ -241,7 +236,6 @@ async function init(): Promise<void> {
     btn.addEventListener("click", () => setView(btn.dataset.view!));
   });
 
-  // Copy
   document.getElementById("jv-copy")!.addEventListener("click", () => {
     navigator.clipboard.writeText(prettyRaw).then(() => {
       const btn = document.getElementById("jv-copy")!;
@@ -253,11 +247,9 @@ async function init(): Promise<void> {
     });
   });
 
-  // Theme toggle
   await updateThemeButton();
   document.getElementById("jv-theme-toggle")!.addEventListener("click", cycleTheme);
 
-  // Settings menu
   const settingsToggle = document.getElementById("jv-settings-toggle")!;
   const settingsMenu = document.getElementById("jv-settings-menu")!;
   settingsToggle.addEventListener("click", () => {
@@ -269,7 +261,6 @@ async function init(): Promise<void> {
     }
   });
 
-  // Custom cursor toggle
   const cursorCheckbox = document.getElementById("jv-cursor-toggle") as HTMLInputElement;
   cursorCheckbox.checked = await storageGet("jv-custom-cursor", "false") === "true";
   cursorCheckbox.addEventListener("change", async () => {
@@ -277,12 +268,11 @@ async function init(): Promise<void> {
     applyCustomCursor(cursorCheckbox.checked);
   });
 
-  // Hover path
   setupHoverPath(tree, pathText, pathDisplay, pathCopyBtn);
 
-  // Inject data into page context.
-  // Skip on sandboxed pages — <script> injection is blocked by CSP
-  // (no `allow-scripts`), producing "Blocked script execution" console errors.
+  // Skip on sandboxed pages — the browser emits 'Blocked script execution'
+  // at the network level before any JS exception is thrown, so the try/catch
+  // inside injectPageData cannot suppress that console noise.
   if (!isSandboxed()) {
     injectPageData(raw);
   }
