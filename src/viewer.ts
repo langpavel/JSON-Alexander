@@ -42,7 +42,7 @@ function escapeHtml(str: string): string {
 
 function renderStringValue(str: string): string {
   if (/^https?:\/\/[^\s]+$/.test(str)) {
-    return `<a class="jv-link" href="` + escapeHtml(str) + `">` + escapeHtml(str) + "</a>"
+    return `<a class="jv-link" rel="noopener noreferrer" href="` + escapeHtml(str) + `">` + escapeHtml(str) + "</a>"
   }
   return escapeHtml(str)
 }
