@@ -1,9 +1,9 @@
-body {
+body:has(#jv-root) {
   margin: 0;
 }
 
 /* ── Overscrolling ── */
-html {
+html:has(#jv-root) {
   background: #181825;
 }
 
