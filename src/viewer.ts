@@ -105,7 +105,7 @@ function escapeHtml(str: string): string {
 function renderStringValue(str: string): string {
   if (/^https?:\/\/[^\s]+$/.test(str)) {
     return (
-      `<a rel="noopener noreferrer" class="jv-link" href="` +
+      `<a class="jv-link" rel="noopener noreferrer" href="` +
       escapeHtml(str) +
       `">` +
       escapeHtml(str) +

@@ -1,6 +1,12 @@
-body {
+body:has(#jv-root) {
   margin: 0;
 }
+
+/* ── Overscrolling ── */
+html:has(#jv-root) {
+  background: #181825;
+}
+
 /* ── Reset ── */
 #jv-root,
 #jv-root * {
