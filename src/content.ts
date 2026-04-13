@@ -46,7 +46,10 @@ function parsePath(path: string): string[] {
   return segments;
 }
 
-function getValueAtPath(source: JsonValue, path: string): JsonValue | undefined {
+function getValueAtPath(
+  source: JsonValue,
+  path: string,
+): JsonValue | undefined {
   const segments = parsePath(path);
   if (!segments.length && path !== "data") return;
 
@@ -100,7 +103,7 @@ async function storageSet(key: string, value: string): Promise<void> {
 }
 
 async function getTabWidth(): Promise<number> {
-  return parseInt(await storageGet("jv-tab-width", "4"), 10);
+  return parseInt(await storageGet("jv-tab-width", "2"), 10);
 }
 
 async function getTheme(): Promise<string> {
@@ -115,7 +118,8 @@ async function setTheme(theme: string): Promise<void> {
 
 async function cycleTheme(): Promise<void> {
   const current = await getTheme();
-  const next = current === "auto" ? "dark" : current === "dark" ? "light" : "auto";
+  const next =
+    current === "auto" ? "dark" : current === "dark" ? "light" : "auto";
   await setTheme(next);
   await updateThemeButton();
 }
@@ -185,11 +189,13 @@ async function init(): Promise<void> {
       root.style.setProperty("--cursor-custom", "default");
     }
   }
-  applyCustomCursor(await storageGet("jv-custom-cursor", "false") === "true");
+  applyCustomCursor((await storageGet("jv-custom-cursor", "false")) === "true");
 
   // Re-inject styles (we nuked the head)
   const style = document.createElement("style");
-  style.textContent = (document.querySelector('style[data-vite-dev-id]') || {} as any).textContent || '';
+  style.textContent =
+    (document.querySelector("style[data-vite-dev-id]") || ({} as any))
+      .textContent || "";
   // For production, the CSS is loaded via manifest. We need to re-add the link.
   // Vite injects CSS as a <style> tag in dev, but for extension we load via manifest.
   // Since we nuked the HTML, re-request the CSS from the extension.
@@ -241,22 +247,25 @@ async function init(): Promise<void> {
   setActiveLevel(allBtn);
 
   function setActiveLevel(active: HTMLElement) {
-    levelsContainer.querySelectorAll("button").forEach((b) =>
-      b.classList.remove("jv-active")
-    );
+    levelsContainer
+      .querySelectorAll("button")
+      .forEach((b) => b.classList.remove("jv-active"));
     active.classList.add("jv-active");
   }
 
   // Toggle expand/collapse on click
   tree.addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
-    if (target.classList.contains("jv-toggle") || target.classList.contains("jv-preview")) {
+    if (
+      target.classList.contains("jv-toggle") ||
+      target.classList.contains("jv-preview")
+    ) {
       const line = target.closest<HTMLElement>(".jv-line");
       if (line) {
         toggleNode(line);
-        levelsContainer.querySelectorAll("button").forEach((b) =>
-          b.classList.remove("jv-active")
-        );
+        levelsContainer
+          .querySelectorAll("button")
+          .forEach((b) => b.classList.remove("jv-active"));
       }
     }
     // Inline action: expand/collapse all children
@@ -285,10 +294,16 @@ async function init(): Promise<void> {
 
   // View picker
   const viewBtns = document.querySelectorAll<HTMLElement>(".jv-view-btn");
-  const views: Record<string, HTMLElement> = { tree, formatted: formattedEl, raw: rawEl };
+  const views: Record<string, HTMLElement> = {
+    tree,
+    formatted: formattedEl,
+    raw: rawEl,
+  };
 
   function setView(name: string) {
-    viewBtns.forEach((b) => b.classList.toggle("jv-active", b.dataset.view === name));
+    viewBtns.forEach((b) =>
+      b.classList.toggle("jv-active", b.dataset.view === name),
+    );
     Object.entries(views).forEach(([key, el]) => {
       el.classList.toggle("jv-active", key === name);
       el.classList.toggle("jv-hidden", key !== name);
@@ -313,7 +328,9 @@ async function init(): Promise<void> {
 
   // Theme toggle
   await updateThemeButton();
-  document.getElementById("jv-theme-toggle")!.addEventListener("click", cycleTheme);
+  document
+    .getElementById("jv-theme-toggle")!
+    .addEventListener("click", cycleTheme);
 
   // Settings menu
   const settingsToggle = document.getElementById("jv-settings-toggle")!;
@@ -328,8 +345,11 @@ async function init(): Promise<void> {
   });
 
   // Custom cursor toggle
-  const cursorCheckbox = document.getElementById("jv-cursor-toggle") as HTMLInputElement;
-  cursorCheckbox.checked = await storageGet("jv-custom-cursor", "false") === "true";
+  const cursorCheckbox = document.getElementById(
+    "jv-cursor-toggle",
+  ) as HTMLInputElement;
+  cursorCheckbox.checked =
+    (await storageGet("jv-custom-cursor", "false")) === "true";
   cursorCheckbox.addEventListener("change", async () => {
     await storageSet("jv-custom-cursor", String(cursorCheckbox.checked));
     applyCustomCursor(cursorCheckbox.checked);
@@ -343,7 +363,9 @@ async function init(): Promise<void> {
   }
   let tabWidth = await getTabWidth();
   applyTabWidth(tabWidth);
-  const tabWidthSelect = document.getElementById("jv-tab-width-select") as HTMLSelectElement;
+  const tabWidthSelect = document.getElementById(
+    "jv-tab-width-select",
+  ) as HTMLSelectElement;
   tabWidthSelect.value = String(tabWidth);
   tabWidthSelect.addEventListener("change", async () => {
     tabWidth = parseInt(tabWidthSelect.value, 10);
